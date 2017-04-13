@@ -1,0 +1,37 @@
+停车场
+总体说明
+有一家停车场管理公司，可为用户提供停车服务。
+公司内包括了三种角色，Parking CEO、Parking Manager和Parking Boy。其中Parking CEO管理多个Parking Manager，Parking Manager管理多个Parking Boy，每个Parking Boy负责若干个停车场，彼此间不会重复。
+Parking Boy有不同的习惯，有的会选择空位最多的停车场，有的会选择停车率最低的停车场，有的会选择最大的停车场。
+系统规则
+1.	每个停车场的车位数目在10到100之间。
+2.	Parking Boy为车主选择停车位的习惯仅有一种（选择空位最多的停车场，选择停车率最低的停车场，选择最大的停车场）。
+3.	每个Parking Boy负责的停车场个数在3到5之间。
+4.	每个Parking Manager负责5个Parking Boy。
+5.	Parking CEO只有一个。
+编程要求
+写一个停车场管理公司内部APP，有三种不同的用户类型，Parking CEO、Parking Manager和Parking Boy。
+1.	停车服务，由Parking CEO提供。
+2.	取车服务，由Parking CEO提供，取车不做权限校验。
+3.	Parking CEO提供的服务会转给Parking Manager、Parking Manager提供的服务会转给Parking Boy具体执行。
+4.	系统提供报表功能，可以查看停车场信息，报表格式如下：
+<ParkingCEO>
+<ParkingManagers>
+			<ParkingManager>
+				<Name></Name>
+				<ParkingBoys>
+					<ParkingBoy>
+						<Name></Name>
+						<ParkingLots>
+							<ParkingLot>
+								<Name></Name>
+								<Count></Count>
+								<Capacity></Capacity>
+							</ParkingLot>
+						</ParkingLots>
+					</ParkingBoy>
+				</ParkingBoys>
+			</ParkingManager>
+		</ParkingManagers>
+</ParkingCEO>
+其中Count表示已占用的停车位，Capacity表示所有停车位。
