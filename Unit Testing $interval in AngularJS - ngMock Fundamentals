@@ -1,0 +1,368 @@
+Following on from the post that detailed unit testing $timeout, this post looks into ngMock’s $interval service. To recap, Angular’s $interval service is a wrapper for the browser’s native implementation of setInterval(), which allows us to define an expression to be evaluated at set intervals (in milliseconds).
+
+The API has the following methods:
+
+Methods	Description
+$interval	We use the service instance itself as a function. It returns an instance of the interval.
+cancel	We can cancel an interval, by passing the instance in question to this method.
+flush([milliseconds])	Executes any interval tasks that are set in the code under test. We can optionally provide a delay in milliseconds to pinpoint the place in time.
+When using the $interval function, we can pass the following arguments:
+
+Argument	Description
+function	This will be the function we wish to execute at the set interval.
+delay	The delay in milliseconds between each execution of our function.
+count (optional)	We can optionally supply a number indicating how many times we wish to repeat the interval until it is stopped. If we do not supply a value or pass an argument of 0, it will run indefinitely (or until we cancel the interval via the cancel method).
+invokeApply (optional)	Default value is true. If we set this to be false, any changes made to the $scope object within the function will not be immediately visible. This will be discussed later in the post.
+Pass (optional)	If our function to be executed required arguments, we can pass these values here in comma separated form e.g. ‘arg 1’, ‘arg 2’, { arg3: ‘value’ }.
+Unit Testing an $interval
+
+Example Application using $interval
+
+In this example, we will only make use of the arguments function, delay and count when creating the $interval. It’s a basic app that has two intervals called every 1 second. The interval calls trivial functions that start with a random number and add 1 upon each execution. The first interval will run indefinitely and the second will only execute 10 times before it stops. We also have a cancel function, that allows us to stop both intervals via a click event.
+
+Here’s the code:
+
+var app = angular.module('calculatorApp', []);
+
+app.controller('CalculatorController', function calculatorController($scope, $interval) {
+
+  $scope.result1 = Math.random();
+  $scope.result2 = Math.random();
+    
+  $scope.sum1 = function sum1() {
+    $scope.result1 = $scope.result1 + 1;
+  }
+
+  $scope.sum2 = function sum2() {
+    $scope.result2 = $scope.result2 + 1;
+  }
+
+  /* Sum Interval #1 - run every 1 second */
+  var sumInterval = $interval($scope.sum1, 1000); 
+
+  /* Sum Interval #2 - run every 1 second, but stop after 10 iterations */
+  var sumIntervalTenTimes = $interval($scope.sum2, 1000, 10); 
+
+  $scope.cancel = function() {
+    if (angular.isDefined(sumInterval) || angular.isDefined(sumIntervalTenTimes)) {
+      $interval.cancel(sumInterval);
+      $interval.cancel(sumIntervalTenTimes);
+      sumInterval = undefined;
+      sumIntervalTenTimes = undefined;
+    }
+  }
+
+  /* Note: we should always have this code in place, to ensure we don't leak intervals. */
+  $scope.$on('$destroy', function() {
+    // ensure that we always close any running intervals when a controller instance is un-loaded.
+    $scope.cancel();
+  });
+
+});
+Here’s how the app would behave in a browser (the starting point is marked in the gif):
+
+unit testing interval angularjs
+
+Note how _Sum Interval #2 stops after 10 iterations._
+
+How would we go about unit testing this application? Since we are not actually unit testing that interval works, we don’t need to concern ourselves with testing behaviour, so in most cases we only need to test that we are calling interval with the correct parameters and using its API in the correct way.
+
+Checking that intervals are setup correctly
+
+The following test code asserts that the interval services are configured correctly, when the controller is initialised:
+
+it('should register the intervals', function () {
+  
+  // We make use of Jasmine's createSpy functionality
+  var $intervalSpy = jasmine.createSpy('$interval', $interval);
+
+  // Create the controller instance and pass in our spy in place of the $interval instance.
+  var calculatorController = $controller('CalculatorController', { $scope: $scope, $interval: $intervalSpy });
+
+  /* Assertions */
+
+  // We can ask if the spy was called
+  expect($intervalSpy).toHaveBeenCalled();
+
+  // Or to make more accurate assertions, such as the number of times called
+  expect($intervalSpy.calls.count()).toBe(2);
+
+  // ... or the arguments passed
+  expect($intervalSpy).toHaveBeenCalledWith($scope.sum1, 1000);
+  expect($intervalSpy).toHaveBeenCalledWith($scope.sum2, 1000, 10);
+
+  // We can also access the calls to the $interval spy as follows:
+  var calls = $intervalSpy.calls.all();
+  var args0 = calls[0].args; // first
+  var args1 = calls[1].args; // second
+  // .. do something interesting here...
+  
+});
+Key points:
+
+We can make use of Jasmine’s createSpy, so that we can track calls, arguments etc to the $interval service. Creating the spy in this way will not call ngMock’s actual implementation of $interval:
+
+var $intervalSpy = jasmine.createSpy('$interval', $interval);
+We can make use of expectations to verify properties of our spy, such as whether it’s been called:
+
+expect($intervalSpy).toHaveBeenCalled();
+We can also check what arguments have been passed to $interval calls, this is useful to verify that we are calling $interval in the code under test with the correct function, delay etc. The following snippet checks that we called timeout for sum1 with a 1 second delay and no count value, and the second line checks that we setup sum2 with a 1 second delay and count of 10 times:
+
+expect($intervalSpy).toHaveBeenCalledWith($scope.sum1, 1000);
+expect($intervalSpy).toHaveBeenCalledWith($scope.sum2, 1000, 10);
+Checking that intervals are cancelled correctly
+
+Next we need to consider how we could test the code that cancels the intervals when the ‘cancel’ button is clicked. It’s similar to the test code we just examined, with a few additions:
+
+it('should cancel the intervals on click', function () {
+
+  // Note that we've added .and.callThough();
+  var $intervalSpy = jasmine.createSpy('$interval', $interval).and.callThrough();
+
+  // we need to register a spy for $interval's cancel function.
+  spyOn($intervalSpy, 'cancel');
+
+  var calculatorController = $controller('CalculatorController', { $scope: $scope, $interval: $intervalSpy });
+
+  // execute the cancel method
+  $scope.cancel();
+
+  expect($intervalSpy.cancel.calls.count()).toBe(2);
+
+  // how do we assert that cancel is called with the correct interval instances?
+  expect($intervalSpy.cancel.calls.argsFor(0)[0].$$intervalId).toBe(0);
+  expect($intervalSpy.cancel.calls.argsFor(1)[0].$$intervalId).toBe(1);
+  
+});
+Key points:
+
+For this test we create the spy with the addition of .and.callThrough(). Doing this means that ngMock’s underlying functionality will be called in addition to the spy:
+
+var $intervalSpy = jasmine.createSpy('$interval', $interval).and.callThrough();
+We need to do this, since in our controller code we keep track of the interval instances so that we can cancel them. If we didn’t call the ngMock functionality, the sumInterval variable in the following snippet would be undefined and we wouldn’t be able to assert the cancel function is called correctly. This snippet demonstrates how the instance is assigned, so that it can be cancelled:
+
+var sumInterval = $interval($scope.sum1, 1000); 
+
+// we need to pass the sumInterval instance in order to cancel it.
+$interval.cancel(sumInterval);
+Lastly, we can check that the expected interval instances are passed as arguments to cancel by their $$intervalId value. The convention in ngMock’s implementation is to increment the id of each new $interval by 1. Here’s how to verify that cancel calls the expected $interval instances:
+
+expect($intervalSpy.cancel.calls.argsFor(0)[0].$$intervalId).toBe(0);
+expect($intervalSpy.cancel.calls.argsFor(1)[0].$$intervalId).toBe(1);
+Example Code:
+
+The full test code is available via this gist.
+
+Unit Testing $interval behaviour
+
+The test code we just reviewed would cover most unit testing scenarios, however, what if we wanted to test some behaviour that involved an interval? In the example that follows, we will also include how to use the invokeApply and pass arguments.
+
+Example Application
+
+In this example application, we have an interval that executes every 1 second. The function will take a starting number and an increment value, and will increment the starting number with the given increment value every 1 second.
+
+Here’s the code:
+
+var app = angular.module('calculatorApp', []);
+
+app.controller('CalculatorController', function calculatorController($scope, $interval) {
+
+  var counterInstance;
+
+  // the main function that increments the number using the function arguments for starting and increment values.
+  var counterFunction = function(start, inc) {
+    if ($scope.ticker === 0 && start)
+      $scope.ticker = start;
+
+    if (!inc)
+      inc = 1;
+
+    $scope.ticker += inc;
+  }
+
+  // defaults
+  $scope.ticker = 0;
+  $scope.from = 0;
+  $scope.inc = 1;
+
+  $scope.start = function() {
+  	// When the 'start' button is clicked, the interval is started with the given parameters.
+    counterInstance = $interval(counterFunction, 1000, $scope.times, true, $scope.from, $scope.inc);
+  }
+
+  /* Cancel functionality removed for brevity (same as last example app)... */
+
+});
+Here’s how the app would behave in a browser (the starting point is marked in the gif):
+
+unit testing interval behaviour angularjs
+
+The following line of code demonstrates how we can pass our two function arguments start and inc. We also have to set invokeApply to true (which is the default value). Here’s the line of code:
+
+$interval(
+	counterFunction, 
+	1000, 					// delay (milliseconds)
+	0,						// count (zero means no limit)
+	true, 					// invokeApply (the default is true)
+	$scope.from, $scope.inc // pass (we can comma separate args)
+);
+When would we set invokeApply to false? In the counterFunction example, the scope is updated each time ($scope.ticker is updated), which in turn is reflected in the UI. Doing this is a costly operation, since we are causing Angular’s digest loop to run each time. If you’ve yet to look into the digest loop, put simply it checks each time to see if the scope has changed, and if so, whether the change(s) should be reflected in the HTML. Each time the counterFunction is executed, under the covers the $apply function is called which triggers this cycle of checking for changes.
+
+If a function isn’t doing anything with the $scope object, it would be a waste of resource to trigger this cycle each time, so we would set invokeApply to be false. You can experiment with this by setting the value to false in our example app, but doing so would cause the starting number not to be updated in the view each time the interval executes.
+
+Unit Testing the Behaviour
+
+With this approach we won’t make use of Jasmine’s spy functionality, we will use ngMock’s $interval implementation to control the execution flow and to check values on our $scope object at certain points in time to verify that our code is doing what we expect. The key function we will use is mock.flush([delay]). The tests that follow make use of flush to advance the interval to a specified point in time:
+
+describe('calculator tests', function () {
+  
+  beforeEach(module('calculatorApp'));
+
+  var $controller;
+  var $scope;
+  var $interval;
+  var $rootScope;
+
+  beforeEach(inject(function(_$controller_,  _$rootScope_, _$interval_) {
+    $controller = _$controller_;
+    $rootScope = _$rootScope_;
+    $scope = _$rootScope_.$new();
+    $interval = _$interval_;
+  }));
+
+  it('should start the interval on click using defaults', function () {
+    var calculatorController = $controller('CalculatorController', { $scope: $scope });
+
+    $scope.start();
+
+    expect($scope.from).toBe(0);
+    expect($scope.inc).toBe(1);
+    expect($scope.ticker).toBe(0);
+
+    // advance in time by 4 seconds
+    $interval.flush(4000);
+
+    expect($scope.ticker).toBe(4);
+  });
+
+  it('should start the interval on click with user values', function () {
+
+    var calculatorController = $controller('CalculatorController', { $scope: $scope });
+
+    $scope.from = 5;
+    $scope.inc = 2;
+    $scope.times = 10;
+
+    $scope.start();
+
+    expect($scope.from).toBe(5);
+    expect($scope.inc).toBe(2);
+    expect($scope.ticker).toBe(0);
+
+    // advance in time by 1 second from call to start()
+    $interval.flush(1100);
+
+    expect($scope.ticker).toBe(7);
+
+    // advance in time by 2 seconds from call to start()
+    $interval.flush(1100);
+
+    expect($scope.ticker).toBe(9);
+
+    // this interval stops after 10 iterations, and therefore should not pass 25!
+    $interval.flush(10000);
+    expect($scope.ticker).toBe(25);
+
+    // Another example to demonstrate the point...
+    $interval.flush(10000);
+    expect($scope.ticker).toBe(25);
+  });
+
+});
+NB The angular documentation states that the argument for flush is optional, but keep in mind that calling flush() with no arguments has no effect.
+
+Key Points:
+
+In the first test, we advanced time by 4 seconds from when the interval was registered by calling the flush function with 4 seconds (as milliseconds):
+
+$interval.flush(4000);
+Using the default values of starting from zero and incrementing by 1, after 4 seconds, our counterFunction should have been called 4 times, and therefore $scope.ticker should be 4.
+
+In the second test, we call the flush function twice, advancing the interval to 1 second and then 2 seconds. Our arguments state that we should start from 5, and add 2 every 1 second. Checking the state after 1 second we expect $scope.ticker to be 7, and after another second it should be 9.
+
+The interval in the second test should also stop after 10 iterations. The test has an expectation to demonstrate this. We started with 5, and add 2 every 1 second, 10 times. Therefore the result should never exceed 25:
+
+$interval.flush(10000);
+expect($scope.ticker).toBe(25);
+Example Code:
+
+The full test code is available via this gist.
+
+Deeper Dive into ngMock and $interval
+
+ngMock has it’s own implementation of $interval as opposed to using a decorator as we have discussed in other posts e.g. $timeout.
+
+If you were to examine ngMock’s source code, you will find the module definition of ngMock and see how the $IntervalProvider is registered in place of angular’s main implementation:
+
+angular.module('ngMock', ['ng']).provider({
+  // other services removed for brevity...
+  $interval: angular.mock.$IntervalProvider
+  // ...
+});
+For reference here is the source code for $interval in ngMock.
+
+Internally, when we create a new $interval instance, the function argument is added to an array of functions. Each function is given a unique id and the point in time at which it was registered is stored. Each time we call flush, all the functions in the array are inspected and if the last time an interval was executed is less than the ‘now time’ + the milliseconds argument passed to flush, the tick function for the interval in question gets called.
+
+The tick function will execute the function passed to the interval when it was created, and each time will check to see if an interval should be cancelled if it reaches the count value. If the count value is reached, the interval in question is removed from the array based on its unique and id and interestingly, a call to deferred.resolve(iteration); is made.
+
+What’s deferred? It’s used by the promise variable returned by the $interval function. In the code snippet below, we see how the call to $interval returns a Promise that’s created by the function:
+
+var instanceOfAPromise = $interval(myFunction, myDelay);
+Angular has its own promise service called $q. A promise is an approach to make asynchronous more readable. Rather than passing callbacks as function arguments, we can register the callbacks via functions called then, catch or finally that will be executed when the interval instance completes or is cancelled.
+
+In the code below, we can register the three functions, then, catch, and finally via the promise instance that’s returned during creation:
+
+instanceOfAPromise.then(function(successCallback, errorCallback, notifyCallback) {
+  console.log('The interval was executed: ' + successCallback + ' times!');
+  console.log('Then status: ' + counterInstance.$$state.status);
+  // errorCallback (always undefined for interval)
+  // notifyCallback (always undefined for interval)
+});
+
+instanceOfAPromise.catch(function(errorCallback) {
+  // called when the interval is cancelled
+  if (errorCallback === 'canceled') {
+    console.log('the interval was cancelled!');
+  } else {
+    console.log('something else went wrong!');
+  }
+  console.log('Catch status: ' + counterInstance.$$state.status);
+});
+
+instanceOfAPromise.finally(function() {
+  // always called regardless
+  console.log('Finally status: ' + counterInstance.$$state.status);
+});
+The key points of this snippet are:
+
+then will be called only when an $interval completes e.g. if we specified it should run only 3 times, i.e. this would not be called for an interval that ran indefinitely.
+catch will be called only if the $interval instance is cancelled.
+finally is always called, if completed or cancelled.
+The arguments passed to the callback functions e.g. successCallback, errorCallback etc are set within the $IntervalProvider code.
+
+The promise also has the following properties. We used $$state.status to printout the status in the previous code snippet and we’ve made use of $$intervalId in earlier unit tests which is unique per interval:
+
+instance.$$intervalId // an id that links the promise to the interval
+instance.$$state // an internal object used by the promise to retain its state.
+The possible values of $$state.status are:
+
+0 - running
+1 - done
+2 - cancelled
+All Example Code
+
+All the main applications examples from this article can be found via the following github gists:
+
+Interval Tests using Jasmine’s Spy
+Interval Tests, testing Behaviour
+Interval Example with Promises
