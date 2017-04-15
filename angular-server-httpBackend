@@ -1,0 +1,85 @@
+$http service
+
+describe('MainCtrl', function() {
+    //我们会在测试中使用这个scope
+    var scope, $httpBackend;
+
+    //模拟我们的Application模块并注入我们自己的依赖
+    beforeEach(angular.mock.module('Application'));
+
+    //模拟Controller，并且包含 $rootScope 和 $controller
+    beforeEach(angular.mock.inject(function($rootScope, $controller, _$httpBackend_) {
+        //设置$httpBackend冲刷$http请求
+        $httpBackend = _$httpBackend_;
+        $httpBackend.when('GET', 'Users/users.json').respond([{
+            id: 1,
+            name: 'Bob'
+        }, {
+            id: 2,
+            name: 'Jane'
+        }]);
+        //创建一个空的 scope
+        scope = $rootScope.$new();
+
+        //声明 Controller并且注入已创建的空的 scope
+        $controller('MainCtrl', {
+            $scope: scope
+        });
+    }));
+
+    // 测试从这里开始
+    it('should have variable text = "Hello World!"', function() {
+        expect(scope.text).toBe('Hello World!');
+    });
+    it('should fetch list of users', function() {
+        $httpBackend.flush();
+        expect(scope.users.length).toBe(2);
+        expect(scope.users[0].name).toBe('Bob');
+        //输出结果以方便查看
+        for(var i=0;i<scope.users.length;i++){
+            console.log(scope.users[i].name);
+        }
+    });
+});
+$httpBackend常用方法
+when
+
+新建一个后端定义（backend definition）。
+
+when(method, url, [data], [headers]);
+expect
+
+新建一个请求期望（request expectation）。
+
+expect(method, url, [data], [headers]);
+when和expect都需要4个参数method, url, data, headers, 其中后2个参数可选。
+
+method表示http方法注意都需要是大写(GET, PUT…);<br/>
+url请求的url可以为正则或者字符串；
+data请求时带的参数，
+headers请求时设置的header。
+如果这些参数都提供了，那只有当这些参数都匹配的时候才会正确的匹配请求。when和expect都会返回一个带respond方法的对象。respond方法有3个参数status，data，headers通过设置这3个参数就可以伪造返回的响应数据了。
+
+区别
+
+$httpBackend.when与$httpBackend.expect的区别在于：$httpBackend.expect的伪后台只能被调用一次(调用一次后会被清除)，第二次调用就会报错，而且$httpBackend.resetExpectations可以移除所有的expect而对when没有影响。
+
+快捷方法
+
+when和expect都有对应的快捷方法whenGET, whenPOST,whenHEAD, whenJSONP, whenDELETE, whenPUT; expect也一样。
+
+//when
+whenGET(url, [headers]);
+whenHEAD(url, [headers]);
+whenDELETE(url, [headers]);
+whenPOST(url, [data], [headers]);
+whenPUT(url, [data], [headers]);
+whenJSONP(url);
+//expect
+expectGET(url, [headers]);
+expectHEAD(url, [headers]);
+expectDELETE(url, [headers]);
+expectPOST(url, [data], [headers]);
+expectPUT(url, [data], [headers]);
+expectPATCH(url, [data], [headers]);
+expectJSONP(url);
