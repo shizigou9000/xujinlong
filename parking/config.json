@@ -1,0 +1,46 @@
+{
+  "character": [
+    {
+      "id": "1",
+      "name": "Parking CEO",
+      "parentId": "0"
+    },
+    {
+      "id": "2",
+      "name": "Parking Manager",
+      "parentId": "1"
+    },
+    {
+      "id": "3",
+      "name": "Parking Boy",
+      "parentId": "2"
+    }
+  ],
+  "parkingHabits": [
+    {
+      "id": "1",
+      "name": "mostVacancies",
+      "description": "Choose the largest parking lot"
+    },
+    {
+      "id": "2",
+      "name": "lowestRate",
+      "description": "Choose the lowest parking rate"
+    },
+    {
+      "id": "3",
+      "name": "theLargest",
+      "description": "Choose The largest parking lot"
+    }
+  ],
+  "ParkingLot": {
+    "min": "10",
+    "max": "100"
+  },
+  "pBoyNumberParking": {
+    "min": "3",
+    "max": "5"
+  },
+  "pManager2pBoy": 5,
+  "pCeo": 1
+}
