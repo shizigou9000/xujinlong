@@ -1,53 +1,63 @@
 var fs = require('fs');
-var parseString = require('xml2js').parseString;
-var system = {}
-system.promptMessage = {
-  'message': 'test'
-};
-system.printReport = function (ceoId, managerId, boyId) {
+var xml2js = require('xml2js');
+var xml2jsBuilder = new xml2js.Builder();
+var parseString = xml2js.parseString;
+function system(path, config) {
+  var self = this;
 
-}
-system.getCharacterList = function (path) {
-  if (fs.existsSync(path)) {
-    fs.readFile(path, function (error, file) {
+  self.characterList = [];
+  self.printReport = printReport;
+  self.saveData = saveData;
+
+  _init();
+
+  function printReport(ceoId, managerId, boyId) {
+
+  }
+
+  function saveData() {
+    var content=_characterList2XmlString();
+    fs.writeFile(path, content);
+  }
+
+  function _characterList2XmlString() {
+    var xmlString=xml2jsBuilder.buildObject(self.characterList);
+    return xmlString;
+  }
+
+  function _formatCharacterList(result) {
+    return result;
+  }
+
+  function _getCharacterList() {
+    var xmlContent = fs.readFileSync(path);
+    parseString(xmlContent, function (error, result) {
       if (!error) {
-        parseString(file, function (err, result) {
-          if (!err) {
-            _formatCharacterList(result);
-          }
-        })
+        self.characterList = _formatCharacterList(result);
       }
     })
   }
-}
-system.saveData = function (content, path) {
-  fs.writeFile(path, content);
-}
-function _formatCharacterList(result) {
-  var ParkingCEOList = result.ParkingCEO;
-  ParkingCEOList.ParkingManagers.ParkingManager;
-  console.log(ParkingCEOList.ParkingManagers[0].ParkingManager);
-}
-list = [
-  {
-    name: ''
-    ParkingManagers: [
-      {
-        name: '',
-        ParkingBoys: [
-          {
-            name: ''
-            ParkingLots: [
-              {
-                Name: ''
-                Count: ''
-                Capacity: ''
-              }
-            ]
-          }
-        ]
-      }
-    ]
+
+  function _init() {
+    if (_isXmlFileDataExist()) {
+      _getCharacterList();
+    } else {
+      _initCharacterList();
+    }
   }
-]
+
+  function _initCharacterList() {
+    self.characterList = {
+      ParkingCEO: {
+        Id: 1,
+        Name: 'ParkingCEO'
+      }
+    };
+    saveData();
+  }
+
+  function _isXmlFileDataExist() {
+    return fs.existsSync(path);
+  }
+}
 module.exports = system;
