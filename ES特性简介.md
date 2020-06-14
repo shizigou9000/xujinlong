@@ -26,7 +26,7 @@ showMyName();
 ```
 
 调用栈
-![showMyName]("./show-my-name.jpg" "showMyName")
+![showMyName](show-my-name.jpg "showMyName")
 因为变量提升，会生成 myName = undefined 的变量定义，在查找变量的时候会使用函数上下文里面的变量
 
 2. <b>本应销毁的变量没有被销毁</b>,看看下面的代码
